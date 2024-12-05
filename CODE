@@ -1,0 +1,711 @@
+import json
+
+import AdaptiveLogic
+import FeedBack
+# from AdaptiveLogic import DrawingApp
+
+from tkinter import ttk, messagebox
+from tkinter import *
+from PIL import ImageTk, Image
+import tkinter as tk
+#from tkinter import ttk
+import random
+
+
+
+# Define your image paths
+adaptive_image_path = r"C:\Users\Tarneet singh\OneDrive\Desktop\adaptation.png"
+assessment_image_path = r"C:\Users\Tarneet singh\OneDrive\Desktop\analytics.png"
+supportive_resources_image_path = r"C:\Users\Tarneet singh\OneDrive\Desktop\resources.png"
+gamified_learning_image_path = r"C:\Users\Tarneet singh\OneDrive\Desktop\activity.png"
+feedback_image_path = r"C:\Users\Tarneet singh\OneDrive\Pictures\Camera Roll\review.png"
+hover_image_path = r"C:\Users\Tarneet singh\OneDrive\Desktop\more-info (1).png"  # The hover image remains the same
+large_image_path = r"C:\Users\Tarneet singh\OneDrive\Pictures\rr.jpg"  # Large image on the right side
+snapshot_path = "snapshot.png"
+
+import cv2
+from fer import FER
+import tkinter as tk
+from tkinter import Label, Frame
+from PIL import Image, ImageTk
+import matplotlib.pyplot as plt
+
+emotion_detector = FER(mtcnn=True)
+
+
+def detect_emotions(frame):
+    emotions = emotion_detector.detect_emotions(frame)
+    if emotions:
+        return emotions[0]['emotions'], emotions[0]['box']
+    return None, None
+
+
+def get_dominant_emotion(emotions):
+    if emotions:
+        return max(emotions.items(), key=lambda item: item[1])
+    return None
+
+
+def save_snapshot(frame, filename):
+    cv2.imwrite(filename, frame)
+
+
+def plot_emotions(emotions, chart_type="bar"):
+    fig, ax = plt.subplots(figsize=(4, 3))
+
+    if chart_type == "bar":
+        colors = plt.cm.Paired.colors  # Use paired colors
+        ax.barh(list(emotions.keys()), list(emotions.values()), color=colors)  # Horizontal bar chart
+        ax.set_xlabel('Score', fontsize=8)
+        ax.set_title('Emotion Recognition Results', fontsize=10, fontweight='bold')
+        ax.tick_params(axis='x', labelsize=8)
+        ax.tick_params(axis='y', labelsize=8)
+        ax.grid(True, linestyle='--', alpha=0.6)
+        plt.tight_layout(pad=1.0)
+    elif chart_type == "pie":
+        ax.pie(emotions.values(), labels=emotions.keys(), autopct='%1.1f%%', colors=plt.cm.Paired.colors)
+        ax.set_title('Emotion Recognition Results', fontsize=10, fontweight='bold')
+
+    plt.savefig("emotion_chart.png", bbox_inches='tight')
+    plt.close()
+
+
+def show_report(emotions, dominant_emotion, snapshot_path):
+    root = tk.Tk()
+    root.geometry("1500x700")
+    root.title("Emotion Recognition Report")
+    root.configure(background='#f0f0f0')
+
+    Label(root, text="test").pack()
+
+    # Create a frame for the image and text
+    report_frame = Frame(root, bg='#ffffff', bd=2, relief="ridge")
+    report_frame.pack(fill="both", expand=True, padx=20, pady=20)
+
+    # Load, resize, and display the snapshot image with a border
+    # img = Image.open("snapshot.png")
+    # # img = img.resize((480, 360))
+    # img = ImageTk.PhotoImage(img)
+    # img_label = Label(report_frame, image=img, bg='#ffffff', bd=2, relief="solid")
+    # img_label.image = img
+    # img_label.pack(pady=10)
+
+    img = ImageTk.PhotoImage(Image.open("snapshot.png"))
+    panel = Label(root, image=img)
+    panel.pack(side="bottom", fill="both", expand="yes")
+
+    # Load and display the emotion chart
+    # chart_img = Image.open("emotion_chart.png")
+    # chart_img = ImageTk.PhotoImage(chart_img)
+    # chart_label = Label(report_frame, image=chart_img, bg='#ffffff')
+    # chart_label.image = chart_img
+    # chart_label.pack(pady=20)
+
+
+
+
+cap = cv2.VideoCapture(0)
+
+
+def checkEmotions():
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
+
+        frame = cv2.flip(frame, 1)
+        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+        emotions, box = detect_emotions(rgb_frame)
+
+        if emotions:
+            x, y, w, h = box
+            cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
+
+            y_offset = 60
+            overlay = frame.copy()
+            for emotion, score in emotions.items():
+                emotion_text = f'{emotion.capitalize()}: {score:.2f}'
+                text_size = cv2.getTextSize(emotion_text, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)[0]
+                text_x = frame.shape[1] - text_size[0] - 20
+                cv2.rectangle(overlay, (text_x - 5, y_offset - 15), (text_x + text_size[0] + 5, y_offset + 5), (0, 0, 0),
+                              -1)
+                cv2.putText(frame, emotion_text, (text_x, y_offset), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
+                y_offset += 30
+            cv2.addWeighted(overlay, 0.5, frame, 0.5, 0, frame)
+
+            dominant_emotion = get_dominant_emotion(emotions)
+            if dominant_emotion:
+                dominant_text = f'Dominant: {dominant_emotion[0].capitalize()}'
+                text_size = cv2.getTextSize(dominant_text, cv2.FONT_HERSHEY_SIMPLEX, 0.8, 2)[0]
+                text_x = frame.shape[1] - text_size[0] - 20
+                cv2.rectangle(frame, (text_x - 5, 5), (text_x + text_size[0] + 5, 35), (0, 0, 0), -1)
+                cv2.putText(frame, dominant_text, (text_x, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)
+
+        exit_text = "PRESS Q TO SEE REPORT"
+        text_size = cv2.getTextSize(exit_text, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)[0]
+        text_x = (frame.shape[1] - text_size[0]) // 2
+        text_y = frame.shape[0] - 20
+        cv2.rectangle(frame, (text_x - 10, text_y - text_size[1] - 10), (text_x + text_size[0] + 10, text_y + 10),
+                      (0, 0, 0), -1)
+        cv2.putText(frame, exit_text, (text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 0), 2)
+
+        cv2.imshow('Emotion Recognition', frame)
+
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            save_snapshot(frame, snapshot_path)
+            cap.release()
+            cv2.destroyAllWindows()
+
+            if emotions:
+                plot_emotions(emotions, chart_type="bar")
+            # show_report(emotions, dominant_emotion, snapshot_path)
+            break
+
+
+class UserData:
+    def __init__(self):
+        self.points = 0
+        self.level = 1
+        self.completed_quests = []
+        self.rewards_earned = []
+        self.load_data()
+
+    def update_points(self, points):
+        self.points += points
+        self.save_data()
+
+    def complete_quest(self, quest_name):
+        if quest_name not in self.completed_quests:
+            self.completed_quests.append(quest_name)
+            self.save_data()
+
+    def earn_reward(self, reward_name):
+        if reward_name not in self.rewards_earned:
+            self.rewards_earned.append(reward_name)
+            self.save_data()
+
+    def save_data(self):
+        with open('user_data.json', 'w') as f:
+            json.dump(self.__dict__, f)
+
+    def load_data(self):
+        try:
+            with open('user_data.json', 'r') as f:
+                data = json.load(f)
+                self.__dict__.update(data)
+        except FileNotFoundError:
+            pass
+
+
+# Quest class for defining and tracking quests
+class Quest:
+    def __init__(self, name, description, reward, completion_criteria):
+        self.name = name
+        self.description = description
+        self.reward = reward
+        self.completion_criteria = completion_criteria
+        self.completed = False
+
+    def complete_quest(self, user_progress):
+        if not self.completed and user_progress >= self.completion_criteria:
+            self.completed = True
+            return self.reward
+        return None
+
+
+# Define some quests
+quests = [
+    Quest("Daily Login", "Log in daily for a week.", 50, 7),
+    Quest("Complete Quiz", "Complete the quiz with 80% or higher.", 100, 80)
+]
+
+
+def check_quests(user_progress):
+    rewards = []
+    for quest in quests:
+        reward = quest.complete_quest(user_progress)
+        if reward:
+            rewards.append(reward)
+    return rewards
+
+
+# Quiz Game Class
+class QuizGame:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Quiz Game")
+        self.root.geometry("600x400")
+        self.root.configure(bg="lightgreen")
+
+        # User data
+        self.user_data = UserData()
+
+        # Define quiz categories and questions
+        self.categories = {
+            "Alphabet": [
+                {"question": "What letter comes after 'A'?", "options": ["B", "C", "D"], "answer": "B", "difficulty": "Easy"},
+                {"question": "What letter is used in 'Hello'?", "options": ["H", "E", "L"], "answer": "L", "difficulty": "Easy"},
+                {"question": "Which letter is in 'Apple' and not in 'Banana'?", "options": ["A", "B", "C"], "answer": "A", "difficulty": "Medium"}
+            ],
+            "Numbers": [
+                {"question": "What is 1 + 1?", "options": ["2", "3", "4"], "answer": "2", "difficulty": "Easy"},
+                {"question": "What is 5 - 3?", "options": ["1", "2", "3"], "answer": "2", "difficulty": "Easy"},
+                {"question": "What is 2 * 3?", "options": ["4", "5", "6"], "answer": "6", "difficulty": "Medium"}
+            ]
+        }
+
+        self.score = 0
+        self.current_question = None
+        self.current_category = None
+
+        self.create_widgets()
+
+    def create_widgets(self):
+        tk.Label(self.root, text="Select Category", font=("Helvetica", 18, "bold"), bg="lightgreen").pack(pady=20)
+
+        for category in self.categories.keys():
+            tk.Button(self.root, text=category, font=("Helvetica", 14), command=lambda c=category: self.start_quiz(c),
+                      bg="lightblue").pack(pady=10, fill=tk.X, padx=50)
+
+        self.result_label = tk.Label(self.root, text="", font=("Helvetica", 16, "bold"), bg="lightgreen")
+        self.result_label.pack(pady=20)
+
+    def start_quiz(self, category):
+        self.current_category = category
+        self.current_question = 0
+        self.score = 0
+        self.ask_question()
+
+    def ask_question(self):
+        if self.current_question < len(self.categories[self.current_category]):
+            question_data = self.categories[self.current_category][self.current_question]
+            self.show_question(question_data)
+        else:
+            self.finish_quiz()
+
+    def show_question(self, question_data):
+        question_frame = tk.Frame(self.root, bg="lightgreen")
+        question_frame.pack(pady=20)
+
+        tk.Label(question_frame, text=question_data["question"], font=("Helvetica", 16), bg="lightgreen").pack()
+
+        self.answer_var = tk.StringVar()
+
+        for option in question_data["options"]:
+            tk.Radiobutton(question_frame, text=option, variable=self.answer_var, value=option, font=("Helvetica", 14),
+                           bg="lightgreen").pack(anchor="w")
+
+        tk.Button(question_frame, text="Submit", command=lambda: self.check_answer(question_frame, question_data)).pack(pady=10)
+
+    def check_answer(self, question_frame, question_data):
+        answer = self.answer_var.get()
+        if answer == question_data["answer"]:
+            self.score += 1
+
+        self.current_question += 1
+        question_frame.destroy()
+        self.ask_question()
+
+    def finish_quiz(self):
+        score_percentage = (self.score / len(self.categories[self.current_category])) * 100
+        self.result_label.config(text=f"You scored {score_percentage}%")
+
+        # Check quests
+        rewards = check_quests(score_percentage)
+        for reward in rewards:
+            self.user_data.earn_reward(reward)
+            messagebox.showinfo("Quest Completed", f"You have earned {reward} points!")
+
+
+# Function to open the quiz game from the Personalized Assessments section
+def open_quiz_game():
+    quiz_window = tk.Toplevel(root)
+    QuizGame(quiz_window)
+# Game Menu Classes
+class GameMenu:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Game Menu")
+        self.root.geometry("400x400")
+        self.root.configure(bg="skyblue")
+
+        tk.Label(self.root, text="Choose a Game", font=("Helvetica", 28, "bold"), bg="skyblue", fg="navy").pack(pady=30)
+
+        buttons = [
+            ("Word Puzzle", self.open_word_puzzle),
+            ("Jigsaw Puzzle", self.open_jigsaw_puzzle),
+            ("Sudoku", self.open_sudoku_game),
+            ("Logic Puzzle", self.open_logic_puzzle)
+
+        ]
+        for text, command in buttons:
+            tk.Button(self.root, text=text, font=("Helvetica", 18, "bold"), command=command, bg="lightgreen", fg="darkgreen", padx=20, pady=10, relief="raised").pack(pady=10, fill=tk.X, padx=50)
+
+    def open_word_puzzle(self):
+        self.open_game(WordPuzzleGame)
+
+    def open_jigsaw_puzzle(self):
+        self.open_game(JigsawPuzzleGame)
+
+    def open_sudoku_game(self):
+        self.open_game(SudokuGame)
+
+    def open_logic_puzzle(self):
+        self.open_game(LogicPuzzleGame)
+
+    def open_maze_puzzle(self):
+        self.open_game(MazePuzzleGame)
+
+    def open_crossword_puzzle(self):
+        self.open_game(CrosswordPuzzleGame)
+
+    def open_match3_puzzle(self):
+        self.open_game(Match3PuzzleGame)
+
+    def open_game(self, game_class):
+        self.root.withdraw()  # Hide the main menu
+        game_window = tk.Toplevel(self.root)
+        game_class(game_window)
+        game_window.protocol("WM_DELETE_WINDOW", self.on_close_game_window)
+
+    def on_close_game_window(self):
+        self.root.deiconify()  # Show the main menu again
+        self.root.quit()  # Quit the application
+
+class WordPuzzleGame:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Word Puzzle Game")
+        self.root.geometry("500x350")
+        self.root.configure(bg="lightyellow")
+
+        self.words = ["python", "tkinter", "puzzle", "anagram", "developer"]
+        self.current_word = random.choice(self.words)
+        self.shuffled_word = "".join(random.sample(self.current_word, len(self.current_word)))
+
+        tk.Label(self.root, text="Unscramble the word", font=("Helvetica", 24, "bold"), bg="lightyellow", fg="darkorange").pack(pady=20)
+        tk.Label(self.root, text=self.shuffled_word, font=("Helvetica", 28, "bold"), bg="lightyellow", fg="darkred").pack(pady=10)
+
+        self.entry = tk.Entry(self.root, font=("Helvetica", 18), justify="center", bd=2, relief="solid")
+        self.entry.pack(pady=10)
+
+        self.result_label = tk.Label(self.root, text="", font=("Helvetica", 18, "bold"), bg="lightyellow")
+        self.result_label.pack(pady=10)
+
+        tk.Button(self.root, text="Submit", font=("Helvetica", 18, "bold"), command=self.check_answer, bg="lightgreen", fg="darkgreen").pack(pady=10)
+        tk.Button(self.root, text="Close", font=("Helvetica", 18, "bold"), command=self.root.destroy, bg="lightcoral", fg="darkred").pack(pady=5)
+
+    def check_answer(self):
+        answer = self.entry.get().lower()
+        if answer == self.current_word:
+            self.result_label.config(text="Correct!", fg="green")
+        else:
+            self.result_label.config(text="Try again!", fg="red")
+
+class JigsawPuzzleGame:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Jigsaw Puzzle")
+        self.root.geometry("400x400")
+        self.root.configure(bg="lightblue")
+
+        self.tiles = [i for i in range(1, 9)] + [None]  # 8 tiles + 1 empty space
+        random.shuffle(self.tiles)
+
+        self.buttons = []
+        for i in range(3):
+            row = []
+            for j in range(3):
+                button = tk.Button(self.root, text=str(self.tiles[i*3+j]) if self.tiles[i*3+j] else "", font=("Helvetica", 20),
+                                   width=5, height=2, command=lambda r=i, c=j: self.move_tile(r, c), bg="lightgrey", fg="black", relief="raised")
+                button.grid(row=i, column=j, padx=5, pady=5)
+                row.append(button)
+            self.buttons.append(row)
+
+    def move_tile(self, row, col):
+        if self.tiles[row*3+col] is None:
+            return  # Can't move empty space
+        # Check adjacent tiles
+        for dr, dc in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+            new_row, new_col = row + dr, col + dc
+            if 0 <= new_row < 3 and 0 <= new_col < 3 and self.tiles[new_row*3+new_col] is None:
+                # Swap the tiles
+                self.tiles[new_row*3+new_col], self.tiles[row*3+col] = self.tiles[row*3+col], self.tiles[new_row*3+new_col]
+                self.buttons[new_row][new_col].config(text=self.buttons[row][col].cget("text"), bg="lightgrey", fg="black")
+                self.buttons[row][col].config(text="", bg="lightblue")
+                break
+
+class SudokuGame:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Sudoku")
+        self.root.geometry("450x450")
+        self.root.configure(bg="lightgoldenrod")
+
+        self.grid = [[None for _ in range(9)] for _ in range(9)]
+
+        self.create_board()
+
+    def create_board(self):
+        for i in range(9):
+            for j in range(9):
+                entry = tk.Entry(self.root, font=("Helvetica", 16), width=2, justify="center", bg="white", fg="black", bd=2, relief="solid")
+                entry.grid(row=i, column=j, padx=5, pady=5)
+                self.grid[i][j] = entry
+
+class LogicPuzzleGame:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Logic Puzzle")
+        self.root.geometry("400x400")
+        self.root.configure(bg="lightpink")
+
+        tk.Label(self.root, text="Simple Logic Puzzle", font=("Helvetica", 24, "bold"), bg="lightpink", fg="darkred").pack(pady=100)
+        tk.Button(self.root, text="Close", font=("Helvetica", 18, "bold"), command=self.root.destroy, bg="lightcoral", fg="darkred").pack(pady=10)
+
+
+def open_gamified_learning_window():
+    detail_window = tk.Toplevel(root)
+    detail_window.title("Gamified Learning")
+    detail_window.geometry("400x400")
+    ttk.Label(detail_window, text="Gamified Learning", font=("Arial", 20, "bold")).pack(pady=10)
+    GameMenu(detail_window)
+
+    # ttk.Label(detail_window,font=("Arial", 14), wraplength=550).pack(pady=10, padx=20)
+    # ttk.Button(detail_window, text="Ready to Play" ,command=lambda: GameMenu(detail_window)).pack(pady=10, padx=20),
+
+
+# def start():
+#     print("Starting application...")
+#     root1 = tk.Tk()
+#     root1.geometry("1200x600")  # Adjusted window size to fit larger images and buttons
+#     # Image paths
+#     image_paths = [
+#         r"C:\Users\Tarneet singh\OneDrive\Pictures\Camera Roll\222.jpg",
+#         r"C:\Users\Tarneet singh\OneDrive\Pictures\Camera Roll\333.jpg",
+#         r"C:\Users\Tarneet singh\OneDrive\Pictures\Camera Roll\444.jpg",
+#         r"C:\Users\Tarneet singh\OneDrive\Pictures\Camera Roll\666.jpg"
+#     ]
+#
+#     # Start the Drawing App
+#     app = DrawingApp(root1, image_paths)
+#     root1.mainloop()
+
+def open_adaptive_learning_window():
+    AdaptiveLogic.start(root)
+    # detail_window = tk.Toplevel(root)
+    #
+    # detail_window.title("Adaptive Learning Paths")
+    # detail_window.geometry("600x400")
+    # ttk.Label(detail_window, text="Adaptive Learning Paths", font=("Arial", 20, "bold")).pack(pady=10)
+    # ttk.Label(detail_window,
+    #           text="Adaptive Learning Paths help personalize your education by tailoring learning experiences "
+    #                "to your individual needs. Key features include personalized learning goals, customizable resources, "
+    #                "progress tracking, and adaptive assessments. Explore how these features can support your unique learning journey.",
+    #           font=("Arial", 14), wraplength=550).pack(pady=10, padx=20)
+    # #ttk.Button(detail_window, text="Give Feedback",
+    #            #command=lambda: tk.messagebox.showinfo("Feedback", "Feedback Collection Placeholder")).pack(pady=10,
+    #                                                                                                        #padx=20)
+
+
+
+def open_personalized_assessments_window():
+    detail_window = tk.Toplevel(root)
+    detail_window.title("Personalized Assessments")
+    detail_window.geometry("800x600")
+
+    # Title and Description
+    title_frame = ttk.Frame(detail_window)
+    title_frame.pack(pady=20)
+    ttk.Label(title_frame, text="Personalized Assessments", font=("Arial", 24, "bold")).pack()
+
+    description_frame = ttk.Frame(detail_window)
+    description_frame.pack(pady=10, padx=30)
+    ttk.Label(description_frame,
+              text="Personalized Assessments tailor evaluation methods to suit individual strengths and needs. Features include customized test formats, adaptive questioning, and detailed feedback. Understand how these assessments can improve learning outcomes.",
+              font=("Arial", 14), wraplength=700, justify="center").pack()
+
+    # Button to Start Quiz (with some spacing and styling)
+    button_frame = ttk.Frame(detail_window)
+    button_frame.pack(pady=30)
+    ttk.Button(detail_window,
+               text="Start Quiz",
+               command=open_quiz_game,
+               style="TButton").pack(pady=10, padx=20)
+
+    # Define the style for the button
+    style = ttk.Style()
+    style.configure("TButton", font=("Arial", 24), background="blue", foreground="red", padding=10)
+
+    # Additional Info or Navigation Section (if needed)
+    #nav_frame = ttk.Frame(detail_window)
+    #nav_frame.pack(pady=20)
+    #tk.Label(nav_frame, text="Explore more about Personalized Learning Paths or Return to the Main Menu",
+              #font=("Arial", 12)).pack()
+    #ttk.Button(nav_frame, text="Back to Main Menu", command=main_menu, width=20).pack(side="left", padx=10)
+    #ttk.Button(nav_frame, text="Personalized Learning Paths", command=open_learning_paths_window, width=20).pack(
+        #side="right", padx=10)
+
+    #ttk.Button(detail_window, text="Start Quiz", command=open_quiz_game).pack(pady=10, padx=20)
+    #ttk.Button(detail_window, text="Give Feedback",
+               #command=lambda: tk.messagebox.showinfo("Feedback", "Feedback Collection Placeholder")).pack(pady=10,
+                                                                                                           #padx=20)
+
+def open_supportive_resources_window():
+    # detail_window = tk.Toplevel(root)
+    # detail_window.title("Supportive Resources")
+    # detail_window.geometry("600x400")
+    # ttk.Label(detail_window, text="Supportive Resources", font=("Arial", 20, "bold")).pack(pady=10)
+    # ttk.Label(detail_window,
+    #           text="S",
+    #           font=("Arial", 14), wraplength=550).pack(pady=10, padx=20)
+    checkEmotions()
+    #ttk.Button(detail_window, text="Give Feedback",
+               #command=lambda: tk.messagebox.showinfo("Feedback", "Feedback Collection Placeholder")).pack(pady=10,
+                                                                                                           #padx=20)
+
+def open_feedback_window():
+    FeedBack.create_feedback_form()
+    # detail_window = tk.Toplevel(root)
+    # detail_window.title("Feedback")
+    # detail_window.geometry("600x400")
+    # ttk.Label(detail_window, text="Feedback", font=("Arial", 20, "bold")).pack(pady=10)
+    # ttk.Label(detail_window,
+    #           text="Feedback allows users to share their experiences and suggestions for improvement. Features include feedback forms, rating systems, "
+    #                "and comment sections. Learn how to provide feedback and contribute to the platform's development.",
+    #           font=("Arial", 14), wraplength=550).pack(pady=10, padx=20)
+    #ttk.Button(detail_window, text="Give Feedback",
+               #command=lambda: tk.messagebox.showinfo("Feedback", "Feedback Collection Placeholder")).pack(pady=10,
+                                                                                                           #padx=20)
+
+
+def create_section(parent, title, description, detail_command, static_image_path):
+    section_frame = ttk.Frame(parent, padding=10, relief="solid", borderwidth=1)
+    section_frame.pack(fill="x", pady=10)
+
+    # Load and display the static image on the left
+    static_image = Image.open(static_image_path)
+    static_image = static_image.resize((100, 100))  # Resize image as needed
+    static_image = ImageTk.PhotoImage(static_image)
+    static_image_label = ttk.Label(section_frame, image=static_image)
+    static_image_label.image = static_image  # Keep a reference to avoid garbage collection
+    static_image_label.pack(side="left", padx=10, pady=10)
+
+    section_text_frame = ttk.Frame(section_frame)
+    section_text_frame.pack(side="left", fill="x", expand=True)
+
+    section_label = ttk.Label(section_text_frame, text=title, font=("Arial", 18, "bold"))
+    section_label.pack(anchor="w")
+
+    section_desc = ttk.Label(section_text_frame, text=description, font=("Arial", 12))
+    section_desc.pack(anchor="w")
+
+    # Load the hover image
+    hover_image = Image.open(hover_image_path)
+    hover_image = hover_image.resize((100, 100))  # Resize image as needed
+    hover_image = ImageTk.PhotoImage(hover_image)
+
+    # Create a Label for the hover image (initially hidden)
+    hover_image_label = ttk.Label(section_frame, image=hover_image)
+    hover_image_label.image = hover_image  # Keep a reference to avoid garbage collection
+
+    # Make the hover image clickable
+    hover_image_label.bind("<Button-1>", lambda e: detail_command())
+
+    def on_enter(event):
+        hover_image_label.pack(side="right", padx=10, pady=10)
+
+    def on_leave(event):
+        hover_image_label.pack_forget()
+
+    section_frame.bind("<Enter>", on_enter)
+    section_frame.bind("<Leave>", on_leave)
+
+# Main application window
+root = tk.Tk()
+root.title("Personalized Education Platform")
+root.geometry("1000x700")  # Increased window size
+
+# Centered Header (Static and Properly Centered)
+header_frame = tk.Frame(root, bg="#006666")
+header_frame.pack(fill="x", side="top")
+
+header_label = ttk.Label(header_frame, text="Unique Minds Connect", font=("Arial", 28, "bold"), background="#006666",
+                         foreground="white", padding=20)
+header_label.pack()
+
+# Create a Frame for the scrollable area
+main_frame = tk.Frame(root)
+main_frame.pack(fill="both", expand=True, padx=10, pady=10)
+
+# Add a Canvas and a Scrollbar
+canvas = tk.Canvas(main_frame)
+scrollbar = tk.Scrollbar(main_frame, orient="vertical", command=canvas.yview)
+canvas.configure(yscrollcommand=scrollbar.set)
+
+# Create a Frame inside the Canvas
+scrollable_frame = tk.Frame(canvas)
+scrollable_frame.bind(
+    "<Configure>",
+    lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+)
+
+# Add the Frame to the Canvas
+canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+scrollbar.pack(side="right", fill="y")
+canvas.pack(side="left", fill="both", expand=True)
+
+# Move the canvas into the main frame
+canvas.master = main_frame
+
+# Create a Frame below the header for the scrollable content
+content_frame = tk.Frame(root)
+content_frame.pack(fill="both", expand=True)
+
+# Move the canvas into the content frame
+canvas.pack(side="left", fill="both", expand=True)
+scrollbar.pack(side="right", fill="y")
+
+# Create a frame for the large image on the right side of the main frame
+large_image_frame = tk.Frame(main_frame, padx=10, pady=10)
+large_image_frame.pack(side="right", fill="y", padx=10)
+
+# Load and display the large image on the right
+large_image = Image.open(large_image_path)
+large_image = large_image.resize((500, 500))  # Resize image as needed
+large_image = ImageTk.PhotoImage(large_image)
+large_image_label = ttk.Label(large_image_frame, image=large_image)
+large_image_label.image = large_image  # Keep a reference to avoid garbage collection
+large_image_label.pack()
+
+# Sections with different static images
+sections = [
+    ("Adaptive Learning Paths", "Discover courses that adapt to your learning pace and style.",
+     open_adaptive_learning_window, adaptive_image_path),
+    ("Personalized Assessments", "Take assessments that are customized to your strengths.",
+     open_personalized_assessments_window, assessment_image_path),
+    ("Supportive Resources", "Access resources to support your learning journey.", open_supportive_resources_window,
+     supportive_resources_image_path),
+    ("Gamified Learning", "Engage with interactive, game-based learning experiences.", open_gamified_learning_window,
+     gamified_learning_image_path),
+    ("Feedback", "Provide and receive feedback to enhance the learning process.", open_feedback_window,
+     feedback_image_path),
+]
+
+for title, description, detail_command, image_path in sections:
+    create_section(scrollable_frame, title, description, detail_command, image_path)
+
+# Footer
+footer_label = ttk.Label(root, text="© 2024 Personalized Education Platform. All rights reserved.", font=("Arial", 12),
+                         background="#004d4d", foreground="white", padding=10)
+footer_label.pack(fill="x", side="bottom")
+
+# Enable smooth scrolling with mouse wheel
+def view_scroll(event):
+    canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+
+canvas.bind_all("<MouseWheel>", view_scroll)
+
+# Run the application
+root.mainloop()
